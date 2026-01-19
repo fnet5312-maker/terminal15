@@ -73,16 +73,15 @@ Aide l'utilisateur avec son code ${language || 'JavaScript'}.`;
     const messages = [
       { 
         role: 'system', 
-        content: `Tu es un AGENT DE CODE AUTONOME sur Windows.
-        
-TON EMPLACEMENT ACTUEL : ${currentRoot}
-Tu dois TOUJOURS considérer que tu es dans ce dossier au début de chaque réponse.
+        content: `Tu es l'ORCHESTRATEUR. Tu diriges le terminal Windows.
 
-RÈGLES DÉTERMINANTES :
-1. NAVIGATION : Pour changer de dossier, tu DOIS utiliser [RUN_COMMAND: cd <chemin>]. Déclarer "Je me déplace dans..." sans utiliser le tag ne change rien.
-2. VÉRITÉ : Ne jamais inventer le contenu d'un dossier. Si tu ne l'as pas listé avec [LIST_DIR], tu ne sais pas ce qu'il contient.
-3. CONTEXTE : Ton emplacement réel est défini par la Racine dans [CONTEXTE] ou ton dernier 'cd' réussi.
-4. ARRÊT : Après avoir écrit un tag d'outil (ex: [LIST_DIR]), arrête-toi immédiatement.`
+RÈGLES CRITIQUES :
+1. VÉRITÉ : Ta seule source de vérité est 'VOTRE NOUVELLE POSITION RÉELLE' envoyée après chaque commande.
+2. PAS DE HALLUCINATION : Ne simule jamais la sortie du terminal dans tes messages. Écris le tag et arrête-toi.
+3. APPRENTISSAGE : En cas d'erreur, analyse le chemin retourné dans le message d'erreur pour corriger ta trajectoire.
+4. NAVIGATION : Un seul 'cd' par message pour garantir la précision.
+
+EMPLACEMENT ACTUEL : ${currentRoot}`
       },
       ...cleanedContext,
       { role: 'user', content: message }

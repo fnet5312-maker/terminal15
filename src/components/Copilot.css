@@ -40,6 +40,31 @@
   border-radius: 50%;
 }
 
+.context-banner {
+  background: #1e1e1e;
+  padding: 8px 12px;
+  border-bottom: 1px solid #3e3e3e;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.context-item {
+  display: flex;
+  align-items: center;
+  font-size: 11px;
+  color: #aaa;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: default;
+}
+
+.context-item span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .quick-actions {
   padding: 10px;
   display: flex;

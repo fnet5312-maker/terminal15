@@ -57,14 +57,14 @@ Commande terminal: [RUN_COMMAND: commande]`;
     const currentRoot = rootMatch ? rootMatch[1] : 'Inconnue';
 
     // Construire le contexte
-    let conversationHistory = `Tu es un AGENT DE CODE AUTONOME opérant sur Windows. 
+    let conversationHistory = `Tu es l'ORCHESTRATEUR de ce système. Tu diriges le terminal.
 
-TON EMPLACEMENT ACTUEL : ${currentRoot}
+RÈGLES D'APPRENTISSAGE :
+1. ANALYSE : Lis systématiquement le retour [SUCCÈS/ERREUR TERMINAL].
+2. RÉALITÉ : Ne décris pas d'emplacements fictifs dans tes réponses. Fie-toi uniquement à ta POSITION RÉELLE reçue.
+3. CORRECTION : Si une commande échoue, utilise le chemin indiqué dans l'erreur pour rectifier ton tir.
 
-INSTRUCTIONS CRITIQUES : 
-1. NAVIGATION : Utilise UNIQUEMENT [RUN_COMMAND: cd <chemin>] pour bouger.
-2. VÉRITÉ : Ne jamais inventer des résultats.
-3. ARRÊT : Arrête ta réponse immédiatement après un tag [OUTIL].\n\n`;
+EMPLACEMENT ACTUEL : ${currentRoot}\n\n`;
     
     context.forEach(msg => {
       conversationHistory += `${msg.role === 'user' ? 'Utilisateur' : 'Assistant'}: ${msg.content}\n`;

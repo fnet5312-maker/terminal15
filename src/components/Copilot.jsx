@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FaPaperPlane, FaRobot, FaCode, FaLightbulb } from 'react-icons/fa';
+import { FaPaperPlane, FaRobot, FaCode, FaLightbulb, FaFolder, FaFile } from 'react-icons/fa';
 import './Copilot.css';
 
 function Copilot({ code, fileName, fileList, rootPath, provider, onCodeInsert, onFileAction, onPathChange }) {
@@ -9,20 +9,16 @@ function Copilot({ code, fileName, fileList, rootPath, provider, onCodeInsert, o
   const [providerStatus, setProviderStatus] = useState({});
 
   useEffect(() => {
-    // Message de bienvenue initial avec le contexte du projet
-    if (messages.length === 0 && Array.isArray(fileList)) {
-      const projectFiles = fileList
-        .map(f => (typeof f === 'string' ? f.split(/[\\\/]/).pop() : f.name))
-        .join(', ');
-      
+    // Message de bienvenue initial
+    if (messages.length === 0) {
       setMessages([{
         role: 'assistant',
-        content: `Bonjour ! Je suis votre agent de code. Je vois que vous travaillez dans \`${rootPath}\`. 
-        Fichiers détectés : ${projectFiles.substring(0, 100)}${projectFiles.length > 100 ? '...' : ''}. 
-        Comment puis-je vous aider aujourd'hui ?`
+        content: `Bonjour ! Je suis votre agent de code. Posez-moi vos questions ou demandez-moi d'effectuer des tâches sur votre projet.
+        
+Conseil : Utilisez le bandeau de contexte en haut pour vérifier mon emplacement actuel.`
       }]);
     }
-  }, [fileList, rootPath]);
+  }, []);
 
   useEffect(() => {
     // Vérifier le statut des providers
@@ -130,14 +126,25 @@ function Copilot({ code, fileName, fileList, rootPath, provider, onCodeInsert, o
                 body: JSON.stringify({ command: param, cwd: currentExecutingPath })
               });
               const cmdData = await res.json();
-              if (cmdData.newCwd) {
-                currentExecutingPath = cmdData.newCwd;
-                if (onPathChange) onPathChange(cmdData.newCwd);
+              
+              // Feedback ultra-précis pour forcer l'IA à apprendre de la réalité du terminal
+              let terminalFeedback = "";
+              if (cmdData.error || (cmdData.stderr && cmdData.code !== 0)) {
+                terminalFeedback = `[ERREUR TERMINAL]: La commande "${param}" a échoué.\nErreur: ${cmdData.stderr || cmdData.error}\nPosition actuelle maintenue: ${currentExecutingPath}`;
+              } else {
+                terminalFeedback = `[SUCCÈS TERMINAL]: Commande "${param}" terminée.\nSortie: ${cmdData.stdout || "Opération réussie"}\n`;
+                if (cmdData.newCwd) {
+                  terminalFeedback += `VOTRE NOUVELLE POSITION RÉELLE: ${cmdData.newCwd}`;
+                  currentExecutingPath = cmdData.newCwd;
+                  if (onPathChange) onPathChange(cmdData.newCwd);
+                }
               }
+
               window.dispatchEvent(new CustomEvent('terminal-run', { 
                 detail: { command: param, output: cmdData.stdout || cmdData.stderr || cmdData.error, isSystem: true } 
               }));
-              autoFeedback += `\n[SORTIE DE ${param}]:\n${cmdData.stdout || ""}\n${cmdData.stderr || ""}\n`;
+
+              autoFeedback += `\n${terminalFeedback}\n`;
             }
           }
         } catch (e) {
@@ -212,6 +219,20 @@ function Copilot({ code, fileName, fileList, rootPath, provider, onCodeInsert, o
           />
           <span>{provider}</span>
         </div>
+      </div>
+
+      {/* Indicateur de Contexte Dynamique */}
+      <div className="context-banner">
+        <div className="context-item" title={rootPath}>
+          <FaFolder style={{ marginRight: '5px', color: '#e8a87c' }} />
+          <span>{rootPath}</span>
+        </div>
+        {fileName && (
+          <div className="context-item" title={fileName}>
+            <FaFile style={{ marginRight: '5px', color: '#61afef' }} />
+            <span>{fileName.split(/[\\\/]/).pop()}</span>
+          </div>
+        )}
       </div>
 
       <div className="quick-actions">

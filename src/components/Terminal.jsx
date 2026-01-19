@@ -261,8 +261,8 @@ function Terminal({ onPathChange, onOpenFile, initialPath = 'C:\\' }) {
 
       // 3. Affichage des sorties
       if (data.stdout) term.write(data.stdout.replace(/\n/g, '\r\n'));
-      if (data.stderr) term.write('\r\n\x1b[31m' + data.stderr.replace(/\n/g, '\r\n') + '\x1b[0m');
-      if (data.error && !data.stderr) term.write('\r\n\x1b[31mError: ' + data.error + '\x1b[0m');
+      if (data.stderr) term.write('\x1b[31m' + data.stderr.replace(/\n/g, '\r\n') + '\x1b[0m');
+      if (data.error && !data.stderr) term.write('\x1b[31mError: ' + data.error + '\x1b[0m');
       
       const hasOutput = data.stdout || data.stderr || data.error;
       if (hasOutput && !data.stdout?.endsWith('\n')) term.write('\r\n');
