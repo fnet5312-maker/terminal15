@@ -15,7 +15,7 @@ router.post('/run', (req, res) => {
 
   // Nettoyage impératif
   command = command.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '').trim();
-  let currentCwd = cwd || process.cwd();
+  let currentCwd = cwd || 'C:\\';
 
   // Commande spéciale pour ouvrir un fichier dans l'éditeur (ex: edit fichier.txt ou notepad fichier.txt)
   const lowerCmd = command.toLowerCase();

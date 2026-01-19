@@ -5,8 +5,8 @@ import path from 'path';
 
 const router = express.Router();
 
-// Racine de base (peut être modifiée dynamiquement)
-let CURRENT_PROJECT_ROOT = process.cwd();
+// Racine de base (Retour à la racine brute du disque)
+let CURRENT_PROJECT_ROOT = 'C:\\';
 
 // Fonction pour mettre à jour la racine du projet
 router.post('/set-root', (req, res) => {
@@ -63,31 +63,51 @@ router.post('/save', async (req, res) => {
 // Lister les fichiers réels
 router.get('/list', async (req, res) => {
   try {
-    const listFiles = async (dir, fileList = [], depth = 0) => {
-      // Limiter la profondeur pour éviter de bloquer sur C:\ ou les très gros projets
-      if (depth > 3) return fileList;
+    const { dir: targetDir, depth: maxDepth = 2 } = req.query;
+    const baseDir = targetDir ? path.resolve(targetDir) : CURRENT_PROJECT_ROOT;
 
-      const files = await fsPromises.readdir(dir);
-      for (const file of files) {
-        // Ignorer les dossiers lourds ou cachés
-        if (['node_modules', '.git', '.venv', '.next', 'dist', 'build'].includes(file)) continue;
-        if (file.startsWith('.')) continue;
+    const listFiles = async (dir, itemList = [], depth = 0) => {
+      // Limiter la profondeur pour la performance
+      if (depth > maxDepth) return itemList;
+
+      try {
+        const files = await fsPromises.readdir(dir);
         
-        try {
-          const filePath = path.join(dir, file);
-          const stats = await fsPromises.stat(filePath);
-          if (stats.isDirectory()) {
-            await listFiles(filePath, fileList, depth + 1);
-          } else {
-            fileList.push(filePath);
-          }
-        } catch (e) { /* skip inaccessible files */ }
-      }
-      return fileList;
+        for (const file of files) {
+          const heavyFolders = [
+            'node_modules', '.git', '.venv', '.next', 'dist', 'build', 
+            'System Volume Information', '$RECYCLE.BIN', 'Config.Msi',
+            'Windows', 'ProgramData', 'AppData', 'Local Settings',
+            'Program Files', 'Program Files (x86)'
+          ];
+          
+          const isHeavy = heavyFolders.includes(file);
+          if (file.startsWith('.') && file !== '.env') continue;
+          
+          try {
+            const filePath = path.join(dir, file);
+            const stats = await fsPromises.stat(filePath);
+            const isDirectory = stats.isDirectory();
+
+            itemList.push({
+                path: filePath,
+                name: file,
+                isDirectory: isDirectory,
+                isHeavy: isHeavy
+            });
+
+            // Ne descendre en récursion QUE si ce n'est pas un dossier lourd et qu'on n'a pas atteint la limite
+            if (isDirectory && !isHeavy && depth < maxDepth) {
+              await listFiles(filePath, itemList, depth + 1);
+            }
+          } catch (e) { }
+        }
+      } catch (e) { }
+      return itemList;
     };
 
-    const files = await listFiles(CURRENT_PROJECT_ROOT);
-    res.json({ files, root: CURRENT_PROJECT_ROOT });
+    const items = await listFiles(baseDir);
+    res.json({ files: items, root: CURRENT_PROJECT_ROOT, current: baseDir });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

@@ -4,25 +4,44 @@ import { FitAddon } from 'xterm-addon-fit';
 import 'xterm/css/xterm.css';
 import './Terminal.css';
 
-function Terminal({ onPathChange, onOpenFile }) {
+function Terminal({ onPathChange, onOpenFile, initialPath = 'C:\\' }) {
   const terminalRef = useRef(null);
   const xtermRef = useRef(null);
   const fitAddonRef = useRef(null);
   const [isMinimized, setIsMinimized] = useState(false);
   const [isReady, setIsReady] = useState(false);
-  const [currentPath, setCurrentPath] = useState('');
-  const pathRef = useRef('');
+  const [currentPath, setCurrentPath] = useState(initialPath);
+  const pathRef = useRef(initialPath);
+  const commandQueue = useRef([]);
+  const isProcessing = useRef(false);
 
   // Synchroniser le ref avec le state
   useEffect(() => {
     pathRef.current = currentPath;
   }, [currentPath]);
 
+  // Synchroniser le terminal si la racine change depuis l'extérieur (ex: sidebar ou démarrage)
+  useEffect(() => {
+    if (xtermRef.current && isReady && initialPath && initialPath !== currentPath) {
+      setCurrentPath(initialPath);
+      pathRef.current = initialPath;
+      
+      // On informe le processus backend du changement de dossier
+      fetch('/api/terminal/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ command: `cd "${initialPath}"` })
+      }).then(() => {
+        displayPrompt(xtermRef.current, initialPath);
+      });
+    }
+  }, [initialPath, isReady]);
+
   // Fonction pour afficher le prompt
   const displayPrompt = (term, path) => {
-    const displayPath = path || '~';
+    const displayPath = path || 'C:\\';
     // Format style Windows/PowerShell comme demandé
-    term.write(`\x1b[1;36mPS\x1b[0m \x1b[1;32m${displayPath}\x1b[0m> `);
+    term.write(`\r\n\x1b[1;36mPS\x1b[0m \x1b[1;32m${displayPath}\x1b[0m> `);
   };
 
   useEffect(() => {
@@ -52,17 +71,24 @@ function Terminal({ onPathChange, onOpenFile }) {
         
         term.writeln('\x1b[1;32mONLINE\x1b[0m - Web IDE Terminal Ready');
         
-        // On récupère le chemin initial
+        // On récupère le chemin initial - Utilise la racine passée en prop
         fetch('/api/terminal/run', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ command: 'cd .' })
+          body: JSON.stringify({ command: `cd "${initialPath}"` })
         })
         .then(res => res.json())
         .then(data => {
-          const root = data.newCwd || 'C:\\Users\\melly\\terminale15';
+          const root = data.newCwd || initialPath;
           setCurrentPath(root);
+          pathRef.current = root;
           displayPrompt(term, root);
+        })
+        .catch(() => {
+          const fallback = initialPath;
+          setCurrentPath(fallback);
+          pathRef.current = fallback;
+          displayPrompt(term, fallback);
         });
 
         xtermRef.current = term;
@@ -72,6 +98,28 @@ function Terminal({ onPathChange, onOpenFile }) {
     };
 
     const timer = setTimeout(init, 300);
+
+    // Écouter les commandes envoyées par l'IA
+    const handleAiCmd = (e) => {
+      if (e.detail && xtermRef.current) {
+        const { command, output, isSystem } = e.detail;
+        
+        if (isSystem) {
+          // Commande déjà exécutée par l'IA, on l'affiche seulement
+          xtermRef.current.write(`\r\n\x1b[1;35m[IA EXEC]\x1b[0m \x1b[1;32m${command}\x1b[0m\r\n`);
+          if (output) {
+            xtermRef.current.write(output.replace(/\n/g, '\r\n'));
+            if (!output.endsWith('\n')) xtermRef.current.write('\r\n');
+          }
+          displayPrompt(xtermRef.current, pathRef.current);
+          xtermRef.current.scrollToBottom();
+        } else if (command) {
+          // Commande à exécuter réellement
+          addToQueue(command);
+        }
+      }
+    };
+    window.addEventListener('terminal-run', handleAiCmd);
 
     // 3. Logique d'entrée (OnData) - Supporte maintenant le copier-coller
     let commandLine = '';
@@ -91,7 +139,7 @@ function Terminal({ onPathChange, onOpenFile }) {
 
       if (e === '\r') { // Enter
         term.write('\r\n');
-        processTerminalCommand(commandLine.trim(), term);
+        addToQueue(commandLine.trim());
         commandLine = '';
       } else if (e === '\x7f' || e === '\b') { // Backspace
         if (commandLine.length > 0) {
@@ -107,8 +155,37 @@ function Terminal({ onPathChange, onOpenFile }) {
       }
     });
 
+    const addToQueue = (cmd) => {
+      if (!cmd) {
+         if (xtermRef.current) displayPrompt(xtermRef.current, pathRef.current);
+         return;
+      }
+      commandQueue.current.push(cmd);
+      processNextInQueue();
+    };
+
+    const processNextInQueue = async () => {
+      if (isProcessing.current || commandQueue.current.length === 0) return;
+
+      isProcessing.current = true;
+      const cmd = commandQueue.current.shift();
+      
+      if (xtermRef.current) {
+        if (cmd.startsWith('[IA EXEC]')) {
+           // Déjà affiché par le message
+        } else {
+           // Optionnel: loguer la commande si elle vient de l'IA
+        }
+      }
+
+      await processTerminalCommand(cmd, xtermRef.current);
+      isProcessing.current = false;
+      processNextInQueue(); // Passer à la suivante
+    };
+
     return () => {
       clearTimeout(timer);
+      window.removeEventListener('terminal-run', handleAiCmd);
       term.dispose();
       xtermRef.current = null;
     };
@@ -147,36 +224,37 @@ function Terminal({ onPathChange, onOpenFile }) {
     };
   }, [isMinimized]);
 
-  const processTerminalCommand = (cmd, term) => {
+  const processTerminalCommand = async (cmd, term) => {
     const activePath = pathRef.current;
     
-    if (!cmd) {
-      displayPrompt(term, activePath);
-      return;
-    }
-
     if (cmd === 'clear') {
       term.reset();
       displayPrompt(term, activePath);
       return;
     }
 
-    // Appel Serveur
-    fetch('/api/terminal/run', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ command: cmd, cwd: activePath })
-    })
-    .then(res => res.json())
-    .then(data => {
-      // 1. Mise à jour PRIORITAIRE du chemin si on a fait un cd
+    // Si la commande vient de l'IA via l'event
+    if (cmd.includes('[IA EXEC]') === false && xtermRef.current && commandQueue.current.length > 0) {
+       // On peut identifier si c'est une commande auto ici
+    }
+
+    try {
+      const res = await fetch('/api/terminal/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ command: cmd, cwd: activePath })
+      });
+      
+      const data = await res.json();
+
+      // 1. Mise à jour PRIORITAIRE du chemin
       if (data.newCwd && data.newCwd !== activePath) {
         setCurrentPath(data.newCwd);
-        pathRef.current = data.newCwd; // Update ref immediately
+        pathRef.current = data.newCwd;
         if (onPathChange) onPathChange(data.newCwd);
       }
 
-      // 2. Ouverture d'un fichier avec chemin résolu par le serveur
+      // 2. Ouverture d'un fichier
       if (data.openFile && onOpenFile) {
         onOpenFile(data.openFile);
       }
@@ -186,21 +264,15 @@ function Terminal({ onPathChange, onOpenFile }) {
       if (data.stderr) term.write('\r\n\x1b[31m' + data.stderr.replace(/\n/g, '\r\n') + '\x1b[0m');
       if (data.error && !data.stderr) term.write('\r\n\x1b[31mError: ' + data.error + '\x1b[0m');
       
-      // Nouveau prompt (avec un saut de ligne si on a eu de la sortie)
       const hasOutput = data.stdout || data.stderr || data.error;
-      if (hasOutput) {
-          // Si la sortie ne finit pas par un saut de ligne, on en ajoute un
-          if (data.stdout && !data.stdout.endsWith('\n')) term.write('\r\n');
-          else if (!data.stdout) term.write('\r\n');
-      }
+      if (hasOutput && !data.stdout?.endsWith('\n')) term.write('\r\n');
       
       displayPrompt(term, data.newCwd || activePath);
       setTimeout(() => term.scrollToBottom(), 20);
-    })
-    .catch(err => {
+    } catch (err) {
       term.write(`\r\n\x1b[31mNetwork Error: ${err.message}\x1b[0m\r\n`);
       displayPrompt(term, activePath);
-    });
+    }
   };
 
   return (

@@ -2,11 +2,27 @@ import React, { useState, useEffect } from 'react';
 import { FaPaperPlane, FaRobot, FaCode, FaLightbulb } from 'react-icons/fa';
 import './Copilot.css';
 
-function Copilot({ code, fileName, provider, onCodeInsert, onFileAction }) {
+function Copilot({ code, fileName, fileList, rootPath, provider, onCodeInsert, onFileAction, onPathChange }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [providerStatus, setProviderStatus] = useState({});
+
+  useEffect(() => {
+    // Message de bienvenue initial avec le contexte du projet
+    if (messages.length === 0 && Array.isArray(fileList)) {
+      const projectFiles = fileList
+        .map(f => (typeof f === 'string' ? f.split(/[\\\/]/).pop() : f.name))
+        .join(', ');
+      
+      setMessages([{
+        role: 'assistant',
+        content: `Bonjour ! Je suis votre agent de code. Je vois que vous travaillez dans \`${rootPath}\`. 
+        Fichiers détectés : ${projectFiles.substring(0, 100)}${projectFiles.length > 100 ? '...' : ''}. 
+        Comment puis-je vous aider aujourd'hui ?`
+      }]);
+    }
+  }, [fileList, rootPath]);
 
   useEffect(() => {
     // Vérifier le statut des providers
@@ -30,30 +46,34 @@ function Copilot({ code, fileName, provider, onCodeInsert, onFileAction }) {
     sendMessage(prompt, codeToAnalyze);
   };
 
-  const sendMessage = async (message, contextCode = null) => {
+  const sendMessage = async (message, contextCode = null, isAutoResponse = false) => {
     if (!message.trim()) return;
 
-    const userMessage = { role: 'user', content: message };
-    setMessages(prev => [...prev, userMessage]);
+    if (!isAutoResponse) {
+      const userMessage = { role: 'user', content: message };
+      setMessages(prev => [...prev, userMessage]);
+    }
+    
     setInput('');
     setLoading(true);
 
     try {
+      // Enrichir TOUJOURS le message avec le contexte du projet, même en auto-réponse
+      const projectContext = `[CONTEXTE: Racine=${rootPath}, FichierActuel=${fileName}]\n`;
+      const fullMessage = projectContext + (contextCode ? `${message}\n\`\`\`\n${contextCode}\n\`\`\`` : message);
+      
       const response = await fetch('/api/copilot/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: contextCode ? `${message}\n\`\`\`\n${contextCode}\n\`\`\`` : message,
-          context: messages,
+          message: fullMessage,
+          context: messages.slice(-10),
           provider
         })
       });
 
       const data = await response.json();
-
-      if (data.error) {
-        throw new Error(data.message || data.error);
-      }
+      if (data.error) throw new Error(data.message || data.error);
 
       const aiMessage = { 
         role: 'assistant', 
@@ -62,36 +82,79 @@ function Copilot({ code, fileName, provider, onCodeInsert, onFileAction }) {
       };
       setMessages(prev => [...prev, aiMessage]);
 
-      // Analyse de l'action de création de fichier
-      const createFileRegex = /\[CREATE_FILE:\s*(.*?)\]\s*```[\w]*\n([\s\S]*?)```/g;
+      // --- LOGIQUE DE SÉQUENCE AUTONOME (BOUCLE DE RÉTROACTION SÉQUENTIELLE) ---
+      let autoFeedback = "";
+      let currentExecutingPath = rootPath;
+
+      // Regex STRICT : On ne prend que ce qui est DANS les crochets
+      // Supprime les préfixes inutiles comme "OUTIL:" ou "COMMAND:" si l'IA en ajoute par erreur
+      const toolRegex = /\[(?:OUTIL|COMMAND|TAG)?[:\s]*(READ_FILE|LIST_DIR|RUN_COMMAND|CREATE_FILE|ACTION)[:\s]*([^\]]*?)\](?:\s*```[\w]*\n([\s\S]*?)```)?/gi;
+      
       let match;
-      while ((match = createFileRegex.exec(data.response)) !== null) {
-        const newFileName = match[1].trim();
-        const content = match[2];
-        if (newFileName && onFileAction) {
-          onFileAction(newFileName, content);
+      while ((match = toolRegex.exec(data.response)) !== null) {
+        let tag = match[1].toUpperCase();
+        if (tag === "ACTION") tag = "LIST_DIR";
+
+        const param = (match[2] || "").trim();
+        const contentBlock = match[3];
+
+        try {
+          if (tag === "READ_FILE") {
+            if (!param) continue;
+            const res = await fetch(`/api/files/read?filePath=${encodeURIComponent(param)}`);
+            const fileData = await res.json();
+            autoFeedback += `\n[CONTENU DE ${param}]:\n${fileData.content || fileData.error}\n`;
+          } 
+          else if (tag === "LIST_DIR") {
+            const dirToList = param || currentExecutingPath;
+            const res = await fetch(`/api/terminal/run`, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ command: `dir /b "${dirToList}"`, cwd: currentExecutingPath })
+            });
+            const listData = await res.json();
+            window.dispatchEvent(new CustomEvent('terminal-run', { 
+              detail: { command: `ls "${dirToList}"`, output: listData.stdout || listData.stderr, isSystem: true } 
+            }));
+            autoFeedback += `\n[LISTE DE ${dirToList}]:\n${listData.stdout || listData.stderr}\n`;
+          }
+          else if (tag === "CREATE_FILE") {
+            if (param && contentBlock && onFileAction) {
+              await onFileAction(param, contentBlock);
+              autoFeedback += `\n[NOTIFICATION]: Fichier ${param} créé.\n`;
+            }
+          }
+          else if (tag === "RUN_COMMAND") {
+            if (param) {
+              const res = await fetch('/api/terminal/run', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ command: param, cwd: currentExecutingPath })
+              });
+              const cmdData = await res.json();
+              if (cmdData.newCwd) {
+                currentExecutingPath = cmdData.newCwd;
+                if (onPathChange) onPathChange(cmdData.newCwd);
+              }
+              window.dispatchEvent(new CustomEvent('terminal-run', { 
+                detail: { command: param, output: cmdData.stdout || cmdData.stderr || cmdData.error, isSystem: true } 
+              }));
+              autoFeedback += `\n[SORTIE DE ${param}]:\n${cmdData.stdout || ""}\n${cmdData.stderr || ""}\n`;
+            }
+          }
+        } catch (e) {
+          autoFeedback += `\n[ERREUR SUR ${tag}]: ${e.message}\n`;
         }
       }
 
-      // Analyse de l'action d'exécution de commande
-      const runCommandRegex = /\[RUN_COMMAND:\s*(.*?)\]/g;
-      let cmdMatch;
-      while ((cmdMatch = runCommandRegex.exec(data.response)) !== null) {
-        const command = cmdMatch[1].trim();
-        if (command) {
-          console.log('🚀 Commande détectée par le copilote:', command);
-          const event = new CustomEvent('terminal-run', { 
-            detail: { command, provider: data.provider || provider } 
-          });
-          window.dispatchEvent(event);
-        }
+      // Si l'IA a besoin de voir les résultats pour continuer sa séquence
+      if (autoFeedback && messages.length < 30) {
+        // Ajouter un petit délai pour que l'utilisateur voit les étapes
+        setTimeout(async () => {
+          await sendMessage(`[RÉSULTAT D'OUTIL]:\n${autoFeedback}\n\nAnalyse ces résultats et continue ta mission.`, null, true);
+        }, 500);
       }
+
     } catch (error) {
-      const errorMessage = { 
-        role: 'error', 
-        content: `Erreur: ${error.message}` 
-      };
-      setMessages(prev => [...prev, errorMessage]);
+      setMessages(prev => [...prev, { role: 'error', content: `Erreur: ${error.message}` }]);
     } finally {
       setLoading(false);
     }

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import CodeMirror from '@uiw/react-codemirror';
 import { javascript } from '@codemirror/lang-javascript';
 import { python } from '@codemirror/lang-python';
@@ -11,6 +11,21 @@ import './Editor.css';
 
 function Editor({ code, fileName, onChange, onSave, provider }) {
   const [saved, setSaved] = useState(true);
+
+  // Gérer la sauvegarde par raccourci Ctrl+S
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        if (onSave) {
+          onSave(code);
+          setSaved(true);
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [code, fileName, onSave]);
 
   const getLanguageExtension = () => {
     const ext = fileName.split('.').pop();

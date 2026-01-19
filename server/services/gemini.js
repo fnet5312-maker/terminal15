@@ -52,10 +52,19 @@ Commande terminal: [RUN_COMMAND: commande]`;
 
     await this.initialize();
 
+    // Extraire la racine
+    const rootMatch = message.match(/\[CONTEXTE: Racine=([^,\]]+)/);
+    const currentRoot = rootMatch ? rootMatch[1] : 'Inconnue';
+
     // Construire le contexte
-    let conversationHistory = `Tu es un assistant de programmation expert et un AGENT DE CODE AUTONOME.
-Création fichier: [CREATE_FILE: nom.ext]
-Commande terminal: [RUN_COMMAND: commande]\n\n`;
+    let conversationHistory = `Tu es un AGENT DE CODE AUTONOME opérant sur Windows. 
+
+TON EMPLACEMENT ACTUEL : ${currentRoot}
+
+INSTRUCTIONS CRITIQUES : 
+1. NAVIGATION : Utilise UNIQUEMENT [RUN_COMMAND: cd <chemin>] pour bouger.
+2. VÉRITÉ : Ne jamais inventer des résultats.
+3. ARRÊT : Arrête ta réponse immédiatement après un tag [OUTIL].\n\n`;
     
     context.forEach(msg => {
       conversationHistory += `${msg.role === 'user' ? 'Utilisateur' : 'Assistant'}: ${msg.content}\n`;

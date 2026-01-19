@@ -6,23 +6,55 @@ import Copilot from './components/Copilot';
 import './App.css';
 
 function App() {
-  const [currentFile, setCurrentFile] = useState('');
+  const [currentFile, setCurrentFile] = useState(localStorage.getItem('lastFile') || '');
   const [fileList, setFileList] = useState([]);
   const [fileContents, setFileContents] = useState({});
-  const [rootPath, setRootPath] = useState('');
-  const [provider, setProvider] = useState('ollama');
+  const [rootPath, setRootPath] = useState(localStorage.getItem('lastRoot') || 'C:\\');
+  const [provider, setProvider] = useState(localStorage.getItem('aiProvider') || 'ollama');
   const [showCopilot, setShowCopilot] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // 1. Charger la liste des fichiers au démarrage
   const refreshFileList = async (autoSelect = false) => {
+    setIsRefreshing(true);
     try {
+      // Synchroniser la racine stockée avec le backend au démarrage
+      const savedRoot = localStorage.getItem('lastRoot') || rootPath;
+      
+      await fetch('/api/files/set-root', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ newPath: savedRoot })
+      });
+
       const res = await fetch('/api/files/list');
       const data = await res.json();
-      console.log('Fichiers reçus:', data.files?.length);
+      
       setFileList(data.files || []);
-      if (data.root) setRootPath(data.root);
+      if (data.root) {
+          setRootPath(data.root);
+          localStorage.setItem('lastRoot', data.root);
+      }
+
+      // Restaurer le dernier fichier ouvert s'il existe toujours
+      const lastFile = localStorage.getItem('lastFile');
+      if (lastFile && !currentFile) {
+          handleFileChange(lastFile);
+      } else if (currentFile) {
+          // Rafraîchir le contenu du fichier actuel
+          const fileRes = await fetch(`/api/files/read?filePath=${encodeURIComponent(currentFile)}`);
+          const fileData = await fileRes.json();
+          if (!fileData.error) {
+            setFileContents(prev => ({ 
+              ...prev, 
+              [currentFile]: fileData.content || '' 
+            }));
+          }
+      }
     } catch (err) {
       console.error('Erreur listage:', err);
+    } finally {
+      setTimeout(() => setIsRefreshing(false), 500);
     }
   };
 
@@ -30,11 +62,12 @@ function App() {
     refreshFileList(true);
   }, []);
 
-  // 2. Changer de fichier (et charger son contenu s'il n'est pas là)
+  // 2. Changer de fichier
   const handleFileChange = async (fileName) => {
     if (!fileName) return;
 
     setCurrentFile(fileName);
+    localStorage.setItem('lastFile', fileName);
     
     try {
       const res = await fetch(`/api/files/read?filePath=${encodeURIComponent(fileName)}`);
@@ -58,6 +91,11 @@ function App() {
   // Synchroniser la racine du projet quand le terminal change de dossier
   const handleRootChange = async (newPath) => {
     try {
+      if (newPath === rootPath) return; // Éviter les boucles infinies
+      
+      setRootPath(newPath);
+      localStorage.setItem('lastRoot', newPath);
+      
       const res = await fetch('/api/files/set-root', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -65,8 +103,6 @@ function App() {
       });
       const data = await res.json();
       if (data.success) {
-        // Obligatoire : attendre que le serveur ait fini de changer la racine
-        // puis forcer un refresh immédiat
         await refreshFileList();
       }
     } catch (err) {
@@ -74,7 +110,12 @@ function App() {
     }
   };
 
-  // 3. Mettre à jour le code localement (sans sauvegarder sur disque immédiatement)
+  const handleProviderChange = (newProvider) => {
+    setProvider(newProvider);
+    localStorage.setItem('aiProvider', newProvider);
+  };
+
+  // 3. Mettre à jour le code localement
   const handleCodeChange = (newCode) => {
     setFileContents(prev => ({
       ...prev,
@@ -90,8 +131,9 @@ function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ filePath: fileName, content: content })
       });
-      // Optionnel: rafraîchir si c'est un nouveau fichier
-      if (!fileList.includes(fileName)) refreshFileList();
+      if (!fileList.some(f => (typeof f === 'string' ? f : f.path) === fileName)) {
+        refreshFileList();
+      }
     } catch (err) {
       console.error('Erreur sauvegarde:', err);
     }
@@ -137,7 +179,7 @@ function App() {
         <h1>🚀 Web IDE with AI Copilot</h1>
         <div className="provider-selector">
           <label>AI Provider:</label>
-          <select value={provider} onChange={(e) => setProvider(e.target.value)}>
+          <select value={provider} onChange={(e) => handleProviderChange(e.target.value)}>
             <option value="ollama">Ollama (Local)</option>
             <option value="gemini">Gemini</option>
             <option value="groq">Groq</option>
@@ -145,7 +187,13 @@ function App() {
           <button onClick={() => setShowCopilot(!showCopilot)}>
             {showCopilot ? '❌' : '🤖'} Copilot
           </button>
-          <button onClick={() => refreshFileList()} title="Rafraîchir les fichiers">🔄</button>
+          <button 
+            onClick={() => refreshFileList()} 
+            className={isRefreshing ? 'refresh-loading' : ''}
+            title="Rafraîchir les fichiers"
+          >
+            🔄
+          </button>
         </div>
       </div>
       
@@ -171,6 +219,7 @@ function App() {
           <Terminal 
             onPathChange={handleRootChange}
             onOpenFile={handleFileChange}
+            initialPath={rootPath}
           />
         </div>
 
@@ -178,9 +227,12 @@ function App() {
           <Copilot 
             code={fileContents[currentFile] || ''}
             fileName={currentFile}
+            fileList={fileList}
+            rootPath={rootPath}
             provider={provider}
             onCodeInsert={(code) => handleCodeChange((fileContents[currentFile] || '') + '\n' + code)}
             onFileAction={handleCreateFileWithContent}
+            onPathChange={handleRootChange}
           />
         )}
       </div>

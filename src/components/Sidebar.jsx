@@ -12,12 +12,15 @@ function Sidebar({ files = [], currentFile, onFileSelect, onNewFile, onDeleteFil
     if (!Array.isArray(files)) return;
 
     const newTree = {};
-    files.forEach(pathStr => {
+    files.forEach(item => {
+      // Gérer si item est un objet (nouveau format) ou une string (ancien format)
+      const pathStr = typeof item === 'string' ? item : item.path;
+      const isDir = typeof item === 'string' ? false : item.isDirectory;
+
       let relativePath = pathStr;
       
       // Nettoyer le chemin
       if (rootPath) {
-        // Normaliser les séparateurs pour la comparaison
         const normalizedRoot = rootPath.replace(/[\\\/]$/, '');
         if (pathStr.startsWith(normalizedRoot)) {
           relativePath = pathStr.slice(normalizedRoot.length).replace(/^[\\\/]/, '');
@@ -31,11 +34,21 @@ function Sidebar({ files = [], currentFile, onFileSelect, onNewFile, onDeleteFil
       
       parts.forEach((part, index) => {
         if (!part) return;
-        if (index === parts.length - 1) {
-          current[part] = { type: 'file', fullPath: pathStr };
+        
+        const isLast = index === parts.length - 1;
+
+        if (isLast) {
+          if (isDir) {
+            if (!current[part]) current[part] = { 
+              type: 'folder', 
+              children: {}, 
+              isHeavy: item.isHeavy // Stocker l'info de dossier lourd
+            };
+          } else {
+            current[part] = { type: 'file', fullPath: pathStr };
+          }
         } else {
           if (!current[part]) current[part] = { type: 'folder', children: {} };
-          // Sécurité au cas où un fichier porterait le même nom qu'un dossier parent
           if (current[part].type === 'file') return; 
           current = current[part].children;
         }
@@ -116,7 +129,7 @@ function Sidebar({ files = [], currentFile, onFileSelect, onNewFile, onDeleteFil
 
 // Composant récursif pour rendre le noeud (Dossier ou Fichier)
 const TreeNode = ({ name, node, currentFile, onFileSelect, onDeleteFile, getFileIcon }) => {
-  const [isOpen, setIsOpen] = useState(true);
+  const [isOpen, setIsOpen] = useState(false); // Fermé par défaut pour éviter de tout charger d'un coup
 
   if (node.type === 'file') {
     const isActive = currentFile === node.fullPath;
@@ -148,8 +161,10 @@ const TreeNode = ({ name, node, currentFile, onFileSelect, onDeleteFile, getFile
         <span className="folder-chevron">
           {isOpen ? <FaChevronDown size={10} /> : <FaChevronRight size={10} />}
         </span>
-        <FaFolder className="folder-icon" color="#e8a87c" />
-        <span className="folder-name">{name}</span>
+        <FaFolder className="folder-icon" color={node.isHeavy ? "#8e9aaf" : "#e8a87c"} />
+        <span className="folder-name" style={{ opacity: node.isHeavy ? 0.8 : 1 }}>
+          {name} {node.isHeavy && <span style={{ fontSize: '0.7em', fontStyle: 'italic', marginLeft: '5px' }}>(poids lourd)</span>}
+        </span>
       </div>
       {isOpen && node.children && (
         <div className="folder-children">

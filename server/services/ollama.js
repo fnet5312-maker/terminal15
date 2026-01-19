@@ -3,7 +3,7 @@ import { Ollama } from 'ollama';
 class OllamaService {
   constructor() {
     this.baseUrl = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
-    this.model = 'codellama';
+    this.model = 'qwen2.5-coder:3b';
     this.client = null;
   }
 
@@ -60,6 +60,10 @@ Aide l'utilisateur avec son code ${language || 'JavaScript'}.`;
     }
     await this.initialize();
 
+    // Extraire la racine du message pour l'injecter dynamiquement dans le system prompt
+    const rootMatch = message.match(/\[CONTEXTE: Racine=([^,\]]+)/);
+    const currentRoot = rootMatch ? rootMatch[1] : 'Inconnue';
+
     // Nettoyer le contexte
     const cleanedContext = context.map(msg => ({
       role: msg.role === 'error' ? 'assistant' : msg.role,
@@ -69,10 +73,16 @@ Aide l'utilisateur avec son code ${language || 'JavaScript'}.`;
     const messages = [
       { 
         role: 'system', 
-        content: `Tu es un assistant de programmation expert et un AGENT DE CODE AUTONOME.
-Tu peux créer des fichiers: [CREATE_FILE: nom.ext]
-Tu peux exécuter des commandes: [RUN_COMMAND: commande]
-Propose des solutions concrètes.`
+        content: `Tu es un AGENT DE CODE AUTONOME sur Windows.
+        
+TON EMPLACEMENT ACTUEL : ${currentRoot}
+Tu dois TOUJOURS considérer que tu es dans ce dossier au début de chaque réponse.
+
+RÈGLES DÉTERMINANTES :
+1. NAVIGATION : Pour changer de dossier, tu DOIS utiliser [RUN_COMMAND: cd <chemin>]. Déclarer "Je me déplace dans..." sans utiliser le tag ne change rien.
+2. VÉRITÉ : Ne jamais inventer le contenu d'un dossier. Si tu ne l'as pas listé avec [LIST_DIR], tu ne sais pas ce qu'il contient.
+3. CONTEXTE : Ton emplacement réel est défini par la Racine dans [CONTEXTE] ou ton dernier 'cd' réussi.
+4. ARRÊT : Après avoir écrit un tag d'outil (ex: [LIST_DIR]), arrête-toi immédiatement.`
       },
       ...cleanedContext,
       { role: 'user', content: message }

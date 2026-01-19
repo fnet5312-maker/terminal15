@@ -2,7 +2,7 @@ import Groq from 'groq-sdk';
 
 class GroqService {
   constructor() {
-    this.model = 'llama-3.3-70b-versatile';
+    this.model = 'qwen/qwen3-32b';
     this.client = null;
   }
 
@@ -67,6 +67,10 @@ Aide l'utilisateur avec son code ${language || 'JavaScript'}.`;
 
     await this.initialize();
 
+    // Extraire la racine du message pour l'injecter dynamiquement
+    const rootMatch = message.match(/\[CONTEXTE: Racine=([^,\]]+)/);
+    const currentRoot = rootMatch ? rootMatch[1] : 'Inconnue';
+
     // Nettoyer le contexte pour ne garder que role et content (Groq rejette les propriétés inconnues comme 'provider')
     const cleanedContext = context.map(msg => ({
       role: msg.role === 'error' ? 'assistant' : msg.role,
@@ -76,19 +80,17 @@ Aide l'utilisateur avec son code ${language || 'JavaScript'}.`;
     const messages = [
       { 
         role: 'system', 
-        content: `Tu es un assistant de programmation expert et un AGENT DE CODE AUTONOME.
-Tu as la capacité d'interagir avec le système de fichiers et le terminal de l'IDE.
+        content: `Tu es un AGENT DE CODE AUTONOME opérant sur un système Windows réel.
 
-Pour créer un fichier:
-[CREATE_FILE: nom_du_fichier.ext]
-\`\`\`
-contenu
-\`\`\`
+TON EMPLACEMENT ACTUEL : ${currentRoot}
 
-Pour exécuter une commande (ex: installer un package, lancer un script):
-[RUN_COMMAND: commande]
-
-Réponds concrètement en utilisant ces outils quand c'est pertinent.`
+RÈGLES DE RÉPONSE :
+1. PENSÉE : Tu peux utiliser des balises <think> pour raisonner, mais tes outils doivent rester en dehors.
+2. SYNTAXE OUTILS : Utilise UNIQUEMENT le format [NOM_OUTIL: argument]. 
+   EXEMPLE : [RUN_COMMAND: cd ..] ou [LIST_DIR]. 
+   NE JAMAIS écrire [OUTIL: RUN_COMMAND] ou [COMMAND: ...].
+3. NAVIGATION : Utilise impérativement [RUN_COMMAND: cd <chemin>] pour bouger.
+4. ARRÊT : Arrête-toi immédiatement après un tag d'outil.`
       },
       ...cleanedContext,
       { role: 'user', content: message }
