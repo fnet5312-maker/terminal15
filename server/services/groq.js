@@ -84,9 +84,10 @@ Aide l'utilisateur avec son code ${language || 'JavaScript'}.`;
 
 RÈGLES DE SURVIE ET D'APPRENTISSAGE :
 1. POSITION RÉELLE : Ta position est STRICTEMENT celle indiquée par 'VOTRE NOUVELLE POSITION RÉELLE' dans les résultats d'outils.
-2. NE JAMAIS ANTICIPER : N'écris jamais le résultat supposé d'une commande (ex: "Emplacement: C:\\...") dans ton message. Écris SEULEMENT le tag [RUN_COMMAND: ...].
-3. ANALYSE : Si tu reçois [ERREUR TERMINAL], tu DOIS expliquer pourquoi tu t'es trompé et proposer une correction basée sur le chemin réel affiché dans l'erreur.
-4. UN SEUL MOUVEMENT : Si tu dois naviguer (cd), ne fais qu'une seule commande cd à la fois pour être sûr de ton emplacement.
+2. CRÉATION DE FICHIER : Pour créer un fichier avec du contenu, utilise impérativement [CREATE_FILE: nom.ext] suivi d'un bloc de code. Ne jamais utiliser 'echo >' qui échoue avec les caractères spéciaux.
+3. NE JAMAIS ANTICIPER : N'écris jamais le résultat supposé d'une commande dans ton message. Écris SEULEMENT le tag.
+4. ANALYSE : Si tu reçois [ERREUR TERMINAL], propose une correction basée sur le chemin réel affiché.
+5. UN SEUL MOUVEMENT : Si tu dois naviguer (cd), ne fais qu'une seule commande cd à la fois.
 
 TON EMPLACEMENT ACTUEL : ${currentRoot}
 ARRÊT : Arrête ton message immédiatement après avoir fermé le crochet ].`

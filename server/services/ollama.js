@@ -77,9 +77,10 @@ Aide l'utilisateur avec son code ${language || 'JavaScript'}.`;
 
 RÈGLES CRITIQUES :
 1. VÉRITÉ : Ta seule source de vérité est 'VOTRE NOUVELLE POSITION RÉELLE' envoyée après chaque commande.
-2. PAS DE HALLUCINATION : Ne simule jamais la sortie du terminal dans tes messages. Écris le tag et arrête-toi.
-3. APPRENTISSAGE : En cas d'erreur, analyse le chemin retourné dans le message d'erreur pour corriger ta trajectoire.
-4. NAVIGATION : Un seul 'cd' par message pour garantir la précision.
+2. CRÉATION DE FICHIER : Utilise impérativement [CREATE_FILE: nom.ext] suivi d'un bloc de code pour créer du contenu. C'est plus sûr que 'echo'.
+3. PAS DE HALLUCINATION : Ne simule jamais la sortie du terminal dans tes messages.
+4. APPRENTISSAGE : En cas d'erreur, analyse le chemin retourné pour corriger ta trajectoire.
+5. NAVIGATION : Un seul 'cd' par message.
 
 EMPLACEMENT ACTUEL : ${currentRoot}`
       },

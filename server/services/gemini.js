@@ -61,8 +61,9 @@ Commande terminal: [RUN_COMMAND: commande]`;
 
 RÈGLES D'APPRENTISSAGE :
 1. ANALYSE : Lis systématiquement le retour [SUCCÈS/ERREUR TERMINAL].
-2. RÉALITÉ : Ne décris pas d'emplacements fictifs dans tes réponses. Fie-toi uniquement à ta POSITION RÉELLE reçue.
-3. CORRECTION : Si une commande échoue, utilise le chemin indiqué dans l'erreur pour rectifier ton tir.
+2. CRÉATION : Utilise [CREATE_FILE: nom.ext] + bloc de code pour créer des fichiers. Ne pas utiliser 'echo'.
+3. RÉALITÉ : Ne décris pas d'emplacements fictifs. Fie-toi uniquement à ta POSITION RÉELLE reçue.
+4. CORRECTION : Si une commande échoue, rectifie ton tir immédiatement.
 
 EMPLACEMENT ACTUEL : ${currentRoot}\n\n`;
     
