@@ -1,0 +1,232 @@
+# 🚀 Web IDE with AI Copilot
+
+Un IDE web complet avec un système de copilote IA intégré supportant **Ollama**, **Gemini** et **Groq**.
+
+## ✨ Fonctionnalités
+
+### 📝 Éditeur de Code
+- Coloration syntaxique pour JavaScript, Python, HTML, CSS, JSON
+- Numérotation des lignes
+- Auto-complétion et fermeture automatique des brackets
+- Thème sombre (One Dark)
+- Sauvegarde de fichiers
+
+### 📁 Explorateur de Fichiers
+- Créer, ouvrir et supprimer des fichiers
+- Navigation intuitive
+- Icônes par type de fichier
+
+### 💻 Terminal Intégré
+- Terminal interactif
+- Commandes de base (help, clear, date, echo, version)
+- Thème cohérent avec l'IDE
+
+### 🤖 Copilote IA Multi-Provider
+- **Ollama** (local) - Gratuit, privé, sans connexion internet requise
+- **Gemini** - Modèle puissant de Google
+- **Groq** - Inférence ultra-rapide
+
+#### Fonctionnalités du Copilote
+- Chat interactif avec l'IA
+- Analyse et explication de code
+- Suggestions d'optimisation
+- Génération de tests unitaires
+- Insertion de code directement dans l'éditeur
+- Actions rapides contextuelles
+
+## 🛠️ Installation
+
+### Prérequis
+- Node.js (v18 ou supérieur)
+- npm ou yarn
+
+### Étapes
+
+1. **Cloner ou télécharger le projet**
+```bash
+cd terminale15
+```
+
+2. **Installer les dépendances**
+```bash
+npm install
+```
+
+3. **Configurer les variables d'environnement**
+```bash
+cp .env.example .env
+```
+
+Éditez le fichier `.env` et ajoutez vos clés API :
+```env
+# Ollama (local - pas de clé requise)
+OLLAMA_BASE_URL=http://localhost:11434
+
+# Gemini API (obtenez votre clé sur https://makersuite.google.com/app/apikey)
+GEMINI_API_KEY=votre_cle_api_gemini_ici
+
+# Groq API (obtenez votre clé sur https://console.groq.com)
+GROQ_API_KEY=votre_cle_api_groq_ici
+
+# Configuration serveur
+PORT=3001
+CLIENT_URL=http://localhost:5173
+```
+
+4. **Configuration d'Ollama (optionnel mais recommandé)**
+
+Ollama est un service local qui permet d'exécuter des modèles d'IA sans connexion internet.
+
+```bash
+# Installer Ollama depuis https://ollama.ai
+# Puis télécharger le modèle CodeLlama
+ollama pull codellama
+```
+
+5. **Démarrer l'application**
+```bash
+npm run dev
+```
+
+Cela démarre :
+- Le serveur backend sur `http://localhost:3001`
+- Le client frontend sur `http://localhost:5173`
+
+6. **Ouvrir dans le navigateur**
+```
+http://localhost:5173
+```
+
+## 📖 Utilisation
+
+### Sélectionner un Provider IA
+
+Dans la barre supérieure, choisissez le provider IA :
+- **Ollama** - Recommandé pour la vie privée et la gratuité
+- **Gemini** - Excellente qualité de réponse
+- **Groq** - Réponses ultra-rapides
+
+### Utiliser le Copilote
+
+1. **Chat direct** : Tapez votre question dans le panneau du copilote
+2. **Actions rapides** :
+   - 📝 Expliquer le code
+   - 💡 Optimiser
+   - 🧪 Ajouter des tests
+3. **Depuis l'éditeur** : Cliquez sur "Copilote" pour analyser votre code
+
+### Raccourcis Clavier
+- `Ctrl+S` - Sauvegarder le fichier actuel
+
+## 🏗️ Architecture
+
+```
+terminale15/
+├── server/                 # Backend Node.js/Express
+│   ├── index.js           # Serveur principal
+│   ├── routes/
+│   │   ├── copilot.js     # Routes API pour le copilote
+│   │   └── files.js       # Gestion des fichiers
+│   └── services/
+│       ├── ollama.js      # Service Ollama
+│       ├── gemini.js      # Service Gemini
+│       └── groq.js        # Service Groq
+├── src/                   # Frontend React
+│   ├── components/
+│   │   ├── Sidebar.jsx    # Explorateur de fichiers
+│   │   ├── Editor.jsx     # Éditeur de code
+│   │   ├── Terminal.jsx   # Terminal
+│   │   └── Copilot.jsx    # Interface copilote
+│   ├── App.jsx            # Composant principal
+│   └── main.jsx           # Point d'entrée
+├── package.json
+└── vite.config.js
+```
+
+## 🔧 Technologies Utilisées
+
+### Frontend
+- **React** - Framework UI
+- **Vite** - Build tool
+- **CodeMirror** - Éditeur de code
+- **XTerm.js** - Terminal
+- **React Icons** - Icônes
+
+### Backend
+- **Express** - Serveur web
+- **Ollama SDK** - Client Ollama
+- **Google Generative AI** - Client Gemini
+- **Groq SDK** - Client Groq
+
+## 🚧 Développement
+
+### Mode développement
+```bash
+npm run dev
+```
+
+### Build production
+```bash
+npm run build
+npm run preview
+```
+
+### Serveur uniquement
+```bash
+npm run server
+```
+
+### Client uniquement
+```bash
+npm run client
+```
+
+## 📝 Notes Importantes
+
+### Ollama
+- Nécessite l'installation locale d'Ollama
+- Gratuit et privé (tout reste sur votre machine)
+- Téléchargez les modèles nécessaires : `ollama pull codellama`
+
+### Gemini
+- Requiert une clé API gratuite de Google
+- Quotas généreux pour le développement
+- Obtenez votre clé : https://makersuite.google.com/app/apikey
+
+### Groq
+- Requiert une clé API
+- Inférence très rapide
+- Obtenez votre clé : https://console.groq.com
+
+## 🐛 Résolution de Problèmes
+
+### Le copilote ne répond pas
+1. Vérifiez que le serveur backend est démarré
+2. Vérifiez vos clés API dans `.env`
+3. Pour Ollama, assurez-vous qu'Ollama est en cours d'exécution
+
+### Erreur de CORS
+- Vérifiez que `CLIENT_URL` dans `.env` correspond à votre URL frontend
+
+### Terminal ne s'affiche pas
+- Rechargez la page
+- Vérifiez la console pour les erreurs
+
+## 🤝 Contribution
+
+Les contributions sont les bienvenues ! N'hésitez pas à :
+- Signaler des bugs
+- Proposer de nouvelles fonctionnalités
+- Améliorer la documentation
+
+## 📄 Licence
+
+MIT
+
+## 👨‍💻 Auteur
+
+Créé avec ❤️ pour les développeurs qui aiment coder avec l'aide de l'IA.
+
+---
+
+**Bon codage avec votre copilote IA ! 🚀**
