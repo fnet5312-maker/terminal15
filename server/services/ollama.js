@@ -1,4 +1,5 @@
 import { Ollama } from 'ollama';
+import projectState from '../state.js';
 
 class OllamaService {
   constructor() {
@@ -30,8 +31,21 @@ class OllamaService {
     await this.initialize();
 
     const systemPrompt = `Tu es un assistant de programmation expert et un AGENT DE CODE AUTONOME.
+
+MÉTHODOLOGIE :
+1. ANALYSE : Lis attentivement le contexte.
+2. RÉFLEXION : Pense étape par étape avant d'agir.
+3. ACTION : Exécute les tâches demandées avec précision.
+
 Tu peux demander la création de fichiers via: [CREATE_FILE: fichier.ext]
 Tu peux EXÉCUTER des commandes via: [RUN_COMMAND: commande]
+
+ACTIONS CLÉS :
+1. "Ouvrir dossier" -> Utilise 'cd dossier'.
+2. "Ouvrir fichier" -> Utilise 'notepad fichier'.
+3. STOP -> Si tu vois "[SUCCESS]" dans la réponse précédente, ARRÊTE.
+4. CRÉATION TERMINAL -> Si demandé explicitement : [RUN_COMMAND: New-Item -Path "fichier" -ItemType File].
+5. TRONQUÉ -> Si tu vois [TRONQUÉ], affine ta commande (ex: Select-Object -First 20) pour lire moins de données à la fois.
 
 Aide l'utilisateur avec son code ${language || 'JavaScript'}.`;
     
@@ -60,30 +74,37 @@ Aide l'utilisateur avec son code ${language || 'JavaScript'}.`;
     }
     await this.initialize();
 
-    // Extraire la racine du message pour l'injecter dynamiquement dans le system prompt
-    const rootMatch = message.match(/\[CONTEXTE: Racine=([^,\]]+)/);
-    const currentRoot = rootMatch ? rootMatch[1] : 'Inconnue';
+    const currentRoot = projectState.getRoot();
+    const systemPrompt = `Tu es un EXPERT système Windows et PowerShell. Tu es un ROBOT ORCHESTRATEUR qui agit via un Terminal réel.
 
-    // Nettoyer le contexte
+CAPACITÉS & OUTILS :
+1. TERMINAL : [RUN_COMMAND: ta_commande]
+   - Utilise TOUTES les commandes PowerShell réelles (ls, dir, cat, cd, etc.).
+   - COMMANDE RÉELLE : 'close' : Ferme le fichier/onglet actif.
+   - COMMANDE RÉELLE : 'close nom.ext' : Ferme spécifiquement l'onglet du fichier indiqué.
+2. ÉDITEUR : [CREATE_FILE: nom.ext] + bloc code : Crée/modifie un contenu (Ouvre/crée un onglet).
+
+RÈGLES D'OR :
+- ANTI-BOUCLE : Si le terminal dit "[SUCCESS]", STOP. Ne répète pas.
+- NAVIGATION : Ouvrir un dossier = 'cd'. Lister = 'ls'.
+- RECHERCHE INTELLIGENTE : Pour trouver un fichier, utilise 'Get-ChildItem -Recurse -Filter "nom"'.
+- CRÉATION PRUDENTE : Ne crée pas de fichiers au hasard si tu ne les trouves pas immédiatement. Cherche mieux.
+- RAISONNEMENT : Si on te dit que tu es dans "C:\Dossier", ne tente pas d'aller dans "C:\Dossier\teste" si tu sais qu'il n'existe pas.
+- PLUS D'OUTILS VIRTUELS : N'utilise jamais [READ_FILE] ou [LIST_DIR]. Utilise 'cat' ou 'dir' via [RUN_COMMAND].
+- ANTI-PARESSE : Si une tâche demande plusieurs étapes, commence immédiatement.
+- ZÉRO HALLUCINATION : Ne simule jamais les sorties de commandes.
+- NAVIGATION : Si tu fais 'cd', le système te confirmera ton nouvel emplacement.
+- CONSCIENCE : Tu as accès aux dernières sorties du terminal dans ton contexte système sous [DERNIÈRES_SORTIES_TERMINAL]. Analyse ces résultats pour valider tes actions ou corriger tes erreurs. Si la sortie est coupée, sois plus précis.
+
+POSITION ACTUELLE : ${currentRoot}`;
+
     const cleanedContext = context.map(msg => ({
-      role: msg.role === 'error' ? 'assistant' : msg.role,
+      role: msg.role === 'error' ? 'assistant' : (msg.role === 'user' ? 'user' : 'assistant'),
       content: msg.content
     }));
 
     const messages = [
-      { 
-        role: 'system', 
-        content: `Tu es l'ORCHESTRATEUR. Tu diriges le terminal Windows.
-
-RÈGLES CRITIQUES :
-1. VÉRITÉ : Ta seule source de vérité est 'VOTRE NOUVELLE POSITION RÉELLE' envoyée après chaque commande.
-2. CRÉATION DE FICHIER : Utilise impérativement [CREATE_FILE: nom.ext] suivi d'un bloc de code pour créer du contenu. C'est plus sûr que 'echo'.
-3. PAS DE HALLUCINATION : Ne simule jamais la sortie du terminal dans tes messages.
-4. APPRENTISSAGE : En cas d'erreur, analyse le chemin retourné pour corriger ta trajectoire.
-5. NAVIGATION : Un seul 'cd' par message.
-
-EMPLACEMENT ACTUEL : ${currentRoot}`
-      },
+      { role: 'system', content: systemPrompt },
       ...cleanedContext,
       { role: 'user', content: message }
     ];

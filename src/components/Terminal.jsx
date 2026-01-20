@@ -4,7 +4,7 @@ import { FitAddon } from 'xterm-addon-fit';
 import 'xterm/css/xterm.css';
 import './Terminal.css';
 
-function Terminal({ onPathChange, onOpenFile, initialPath = 'C:\\' }) {
+function Terminal({ onPathChange, onOpenFile, onCloseFile, initialPath = 'C:\\' }) {
   const terminalRef = useRef(null);
   const xtermRef = useRef(null);
   const fitAddonRef = useRef(null);
@@ -39,6 +39,7 @@ function Terminal({ onPathChange, onOpenFile, initialPath = 'C:\\' }) {
 
   // Fonction pour afficher le prompt
   const displayPrompt = (term, path) => {
+    if (!term) return; // Sécurité si le terminal n'est pas prêt ou démonté
     const displayPath = path || 'C:\\';
     // Format style Windows/PowerShell comme demandé
     term.write(`\r\n\x1b[1;36mPS\x1b[0m \x1b[1;32m${displayPath}\x1b[0m> `);
@@ -225,6 +226,7 @@ function Terminal({ onPathChange, onOpenFile, initialPath = 'C:\\' }) {
   }, [isMinimized]);
 
   const processTerminalCommand = async (cmd, term) => {
+    if (!term) return;
     const activePath = pathRef.current;
     
     if (cmd === 'clear') {
@@ -259,12 +261,29 @@ function Terminal({ onPathChange, onOpenFile, initialPath = 'C:\\' }) {
         onOpenFile(data.openFile);
       }
 
+      // Fermeture d'un fichier ou de l'éditeur
+      if ((data.closeEditor || data.closeFile) && onCloseFile) {
+        onCloseFile(data.closeFile !== true ? data.closeFile : null);
+      }
+
       // 3. Affichage des sorties
       if (data.stdout) term.write(data.stdout.replace(/\n/g, '\r\n'));
       if (data.stderr) term.write('\x1b[31m' + data.stderr.replace(/\n/g, '\r\n') + '\x1b[0m');
       if (data.error && !data.stderr) term.write('\x1b[31mError: ' + data.error + '\x1b[0m');
       
       const hasOutput = data.stdout || data.stderr || data.error;
+      
+      // Notifier le système de la commande et de sa sortie (pour Copilot)
+      window.dispatchEvent(new CustomEvent('terminal-output', {
+        detail: {
+          command: cmd,
+          stdout: data.stdout,
+          stderr: data.stderr || data.error,
+          cwd: data.newCwd || activePath,
+          code: data.code
+        }
+      }));
+
       if (hasOutput && !data.stdout?.endsWith('\n')) term.write('\r\n');
       
       displayPrompt(term, data.newCwd || activePath);

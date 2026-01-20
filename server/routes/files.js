@@ -2,23 +2,19 @@ import express from 'express';
 import fsPromises from 'fs/promises';
 import fs from 'fs';
 import path from 'path';
+import projectState from '../state.js';
 
 const router = express.Router();
-
-// Racine de base (Retour à la racine brute du disque)
-let CURRENT_PROJECT_ROOT = 'C:\\';
 
 // Fonction pour mettre à jour la racine du projet
 router.post('/set-root', (req, res) => {
   const { newPath } = req.body;
   if (!newPath) return res.status(400).json({ error: 'Chemin requis' });
   
-  const resolvedPath = path.resolve(newPath);
-  if (fs.existsSync(resolvedPath) && fs.lstatSync(resolvedPath).isDirectory()) {
-    CURRENT_PROJECT_ROOT = resolvedPath;
-    console.log(`📍 Nouvelle racine projet : ${CURRENT_PROJECT_ROOT}`);
-    res.json({ success: true, root: CURRENT_PROJECT_ROOT });
-  } else {
+  try {
+    projectState.setRoot(newPath);
+    res.json({ success: true, root: projectState.getRoot() });
+  } catch (error) {
     res.status(400).json({ error: 'Chemin invalide ou dossier inexistant' });
   }
 });
@@ -28,7 +24,7 @@ const getFullPath = (filePath) => {
   // Si le chemin est déjà absolu (ex: C:\...), on l'utilise tel quel
   if (path.isAbsolute(filePath)) return filePath;
   // Sinon on le résout par rapport à la racine actuelle du projet
-  return path.resolve(CURRENT_PROJECT_ROOT, filePath);
+  return path.resolve(projectState.getRoot(), filePath);
 };
 
 // Lire un fichier réel
@@ -64,7 +60,7 @@ router.post('/save', async (req, res) => {
 router.get('/list', async (req, res) => {
   try {
     const { dir: targetDir, depth: maxDepth = 2 } = req.query;
-    const baseDir = targetDir ? path.resolve(targetDir) : CURRENT_PROJECT_ROOT;
+    const baseDir = targetDir ? path.resolve(targetDir) : projectState.getRoot();
 
     const listFiles = async (dir, itemList = [], depth = 0) => {
       // Limiter la profondeur pour la performance
@@ -107,7 +103,7 @@ router.get('/list', async (req, res) => {
     };
 
     const items = await listFiles(baseDir);
-    res.json({ files: items, root: CURRENT_PROJECT_ROOT, current: baseDir });
+    res.json({ files: items, root: projectState.getRoot(), current: baseDir });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -121,6 +117,20 @@ router.delete('/delete', async (req, res) => {
 
     const fullPath = getFullPath(filePath);
     await fsPromises.unlink(fullPath);
+    res.json({ success: true, filePath: fullPath });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Créer un dossier réel (mkdir -p)
+router.post('/mkdir', async (req, res) => {
+  try {
+    const { filePath } = req.body;
+    if (!filePath) return res.status(400).json({ error: 'Chemin requis' });
+
+    const fullPath = getFullPath(filePath);
+    await fsPromises.mkdir(fullPath, { recursive: true });
     res.json({ success: true, filePath: fullPath });
   } catch (error) {
     res.status(500).json({ error: error.message });

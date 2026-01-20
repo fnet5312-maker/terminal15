@@ -1,13 +1,209 @@
 <!DOCTYPE html>
-<html lang="fr">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Web IDE with AI Copilot</title>
-  </head>
-  <body>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AutoPilot Architect Prototype</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { 
+          font-family: 'Inter', sans-serif; 
+          transition: background-color 0.5s ease;
+          overflow: hidden;
+          -webkit-font-smoothing: antialiased;
+          -moz-osx-font-smoothing: grayscale;
+        }
+        .mono { font-family: 'JetBrains Mono', monospace; }
+        
+        /* ===== CUSTOM SCROLLBARS - SIDEBAR & MISSION CONTROL ===== */
+        .custom-scrollbar::-webkit-scrollbar { 
+          width: 10px; 
+          height: 10px; 
+        }
+        
+        /* Dark Theme - Sidebar & Mission Control */
+        .bg-\[\#09090b\] .custom-scrollbar::-webkit-scrollbar-track { 
+          background: transparent; 
+        }
+        .bg-\[\#09090b\] .custom-scrollbar::-webkit-scrollbar-thumb { 
+          background: linear-gradient(180deg, #3730a3 0%, #6366f1 100%);
+          border-radius: 10px; 
+          border: 2px solid #09090b;
+          transition: all 0.3s ease;
+        }
+        .bg-\[\#09090b\] .custom-scrollbar::-webkit-scrollbar-thumb:hover { 
+          background: linear-gradient(180deg, #4f46e5 0%, #818cf8 100%);
+          border-color: #18181b;
+          box-shadow: 0 0 10px rgba(99, 102, 241, 0.5);
+        }
+        .bg-\[\#09090b\] .custom-scrollbar::-webkit-scrollbar-thumb:active { 
+          background: linear-gradient(180deg, #6366f1 0%, #a5b4fc 100%);
+        }
+
+        /* Light Theme - Sidebar & Mission Control */
+        .bg-\[\#f8fafc\] .custom-scrollbar::-webkit-scrollbar-track { 
+          background: transparent; 
+        }
+        .bg-\[\#f8fafc\] .custom-scrollbar::-webkit-scrollbar-thumb { 
+          background: linear-gradient(180deg, #818cf8 0%, #a5b4fc 100%);
+          border-radius: 10px; 
+          border: 2px solid #f8fafc;
+          transition: all 0.3s ease;
+        }
+        .bg-\[\#f8fafc\] .custom-scrollbar::-webkit-scrollbar-thumb:hover { 
+          background: linear-gradient(180deg, #6366f1 0%, #818cf8 100%);
+          border-color: #e2e8f0;
+          box-shadow: 0 0 10px rgba(99, 102, 241, 0.3);
+        }
+        .bg-\[\#f8fafc\] .custom-scrollbar::-webkit-scrollbar-thumb:active { 
+          background: linear-gradient(180deg, #4f46e5 0%, #6366f1 100%);
+        }
+
+        /* ===== EDITOR SCROLLBARS - ARCHITECTURE OPTIMISÉE ===== */
+        .editor-scroll-container::-webkit-scrollbar {
+          width: 14px;
+          height: 14px;
+        }
+
+        /* Dark Theme - Editor Container */
+        .bg-\[\#09090b\] .editor-scroll-container::-webkit-scrollbar-track {
+          background: #0c0c0e;
+          border-left: 1px solid #18181b;
+          border-top: 1px solid #18181b;
+        }
+        .bg-\[\#09090b\] .editor-scroll-container::-webkit-scrollbar-thumb {
+          background: linear-gradient(135deg, #27272a 0%, #3f3f46 50%, #27272a 100%);
+          border: 3px solid #0c0c0e;
+          border-radius: 7px;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .bg-\[\#09090b\] .editor-scroll-container::-webkit-scrollbar-thumb:hover {
+          background: linear-gradient(135deg, #3f3f46 0%, #6366f1 50%, #3f3f46 100%);
+          border-color: #18181b;
+          box-shadow: 
+            0 0 15px rgba(99, 102, 241, 0.4),
+            inset 0 1px 1px rgba(255, 255, 255, 0.1);
+        }
+        .bg-\[\#09090b\] .editor-scroll-container::-webkit-scrollbar-thumb:active {
+          background: linear-gradient(135deg, #6366f1 0%, #818cf8 50%, #6366f1 100%);
+          box-shadow: 
+            0 0 20px rgba(99, 102, 241, 0.6),
+            inset 0 1px 2px rgba(255, 255, 255, 0.2);
+        }
+        .bg-\[\#09090b\] .editor-scroll-container::-webkit-scrollbar-corner {
+          background: #0c0c0e;
+          border: 1px solid #18181b;
+        }
+
+        /* Light Theme - Editor Container */
+        .bg-\[\#f8fafc\] .editor-scroll-container::-webkit-scrollbar-track {
+          background: #ffffff;
+          border-left: 1px solid #e2e8f0;
+          border-top: 1px solid #e2e8f0;
+        }
+        .bg-\[\#f8fafc\] .editor-scroll-container::-webkit-scrollbar-thumb {
+          background: linear-gradient(135deg, #cbd5e1 0%, #94a3b8 50%, #cbd5e1 100%);
+          border: 3px solid #ffffff;
+          border-radius: 7px;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .bg-\[\#f8fafc\] .editor-scroll-container::-webkit-scrollbar-thumb:hover {
+          background: linear-gradient(135deg, #94a3b8 0%, #6366f1 50%, #94a3b8 100%);
+          border-color: #f1f5f9;
+          box-shadow: 
+            0 0 15px rgba(99, 102, 241, 0.3),
+            inset 0 1px 1px rgba(255, 255, 255, 0.2);
+        }
+        .bg-\[\#f8fafc\] .editor-scroll-container::-webkit-scrollbar-thumb:active {
+          background: linear-gradient(135deg, #6366f1 0%, #4f46e5 50%, #6366f1 100%);
+          box-shadow: 
+            0 0 20px rgba(99, 102, 241, 0.5),
+            inset 0 1px 2px rgba(255, 255, 255, 0.3);
+        }
+        .bg-\[\#f8fafc\] .editor-scroll-container::-webkit-scrollbar-corner {
+          background: #ffffff;
+          border: 1px solid #e2e8f0;
+        }
+
+        /* ===== OPTIMISATIONS ÉDITEUR ===== */
+        /* Masquer la scrollbar native du textarea */
+        .editor-textarea::-webkit-scrollbar {
+          display: none;
+        }
+        .editor-textarea {
+          scrollbar-width: none;
+          -ms-overflow-style: none;
+        }
+
+        /* Highlight de ligne optimisé */
+        .editor-line-highlight {
+          transition: top 0.1s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* Firefox Scrollbar Support */
+        .editor-scroll-container {
+          scrollbar-width: thin;
+        }
+        .bg-\[\#09090b\] .editor-scroll-container {
+          scrollbar-color: #6366f1 #0c0c0e;
+        }
+        .bg-\[\#f8fafc\] .editor-scroll-container {
+          scrollbar-color: #6366f1 #ffffff;
+        }
+
+        /* Smooth scrolling avec scroll horizontal automatique */
+        .editor-scroll-container {
+          scroll-behavior: smooth;
+          scroll-padding: 40px;
+          /* 🔧 CORRECTION: Scroll horizontal automatique */
+          overflow-x: auto;
+          overflow-y: auto;
+        }
+
+        /* Selection colors */
+        .editor-textarea::selection {
+          background: rgba(99, 102, 241, 0.3);
+        }
+        .editor-textarea::-moz-selection {
+          background: rgba(99, 102, 241, 0.3);
+        }
+
+        /* Caret personnalisé */
+        .editor-textarea {
+          caret-color: #6366f1;
+        }
+
+        /* Optimisation du rendu */
+        .editor-pre {
+          contain: content;
+        }
+
+        /* Support mobile */
+        @media (max-width: 768px) {
+          .editor-scroll-container::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+          }
+        }
+    </style>
+    <script type="importmap">
+{
+  "imports": {
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "react": "https://esm.sh/react@^19.2.3",
+    "@google/genai": "https://esm.sh/@google/genai@^1.35.0",
+    "jszip": "https://esm.sh/jszip@3.10.1"
+  }
+}
+</script>
+</head>
+<body class="bg-[#09090b] text-zinc-100 overflow-hidden">
     <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
-  </body>
+    <script type="module" src="./src/main.jsx"></script>
+</body>
 </html>

@@ -85,13 +85,18 @@ router.post('/chat', async (req, res) => {
 
 // Route pour vérifier la disponibilité des services
 router.get('/status', async (req, res) => {
-  const status = {
-    ollama: await ollamaService.isAvailable(),
-    gemini: await geminiService.isAvailable(),
-    groq: await groqService.isAvailable()
-  };
+  try {
+    const status = {
+      ollama: await ollamaService.isAvailable(),
+      gemini: await geminiService.isAvailable(),
+      groq: await groqService.isAvailable()
+    };
   
-  res.json(status);
+    res.json(status);
+  } catch (error) {
+    console.error('Erreur status:', error);
+    res.status(500).json({ error: 'Erreur verification status', message: error.message });
+  }
 });
 
 export default router;

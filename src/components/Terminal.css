@@ -1,39 +1,55 @@
-/* RECONSTRUCTION TOTALE - ARCHITECTURE VSCODE */
+/* Terminal UI revamp - glass/gradient theme aligned with Copilot */
 .terminal-container {
-  height: 450px; /* Augmenté pour plus de confort (4-5 lignes de plus) */
-  background-color: #1e1e1e;
-  border-top: 1px solid #333;
+  --panel-bg: radial-gradient(circle at 15% 20%, #121826 0%, #0c0f16 45%, #0a0d14 100%);
+  --surface: #141824;
+  --surface-2: #1c2130;
+  --accent: #7dd3fc;
+  --accent-2: #a78bfa;
+  --muted: #96a0b5;
+  --text: #e6ecff;
+
+  height: 55vh;
+  min-height: 320px;
+  max-height: 820px;
+  flex-shrink: 0;
+  background: var(--panel-bg);
+  border-top: 1px solid #1f2533;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  box-shadow: 0 -12px 30px rgba(0, 0, 0, 0.35);
 }
 
 .terminal-header {
-  height: 35px;
-  background-color: #252526;
+  height: 42px;
+  background: linear-gradient(135deg, rgba(61, 93, 247, 0.16), rgba(122, 179, 255, 0.1));
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0 10px;
+  padding: 0 12px;
   cursor: pointer;
   user-select: none;
+  border-bottom: 1px solid #1f2533;
+  backdrop-filter: blur(8px);
 }
 
 .terminal-title {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 11px;
-  color: #cccccc;
+  font-size: 12px;
+  color: var(--text);
   text-transform: uppercase;
-  font-family: sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.4px;
 }
 
 .terminal-body {
   flex: 1;
-  background-color: #1e1e1e;
+  background: #0c0f16;
   position: relative;
   overflow: hidden; /* XTERM GERE LE SCROLL */
+  border-top: 1px solid rgba(255, 255, 255, 0.03);
 }
 
 /* L'ELEMENT OU XTERM S'OUVRE NE DOIT AVOIR AUCUN PADDING */
@@ -43,14 +59,16 @@
 }
 
 .terminal-container.minimized {
-  height: 35px;
-}
+  height: 42px;
+  height: 42px;
+  min-height: 42px;
+  max-height: 42px;
 
 .terminal-body.hidden {
   display: none;
 }
 
 .xterm-viewport {
-  background-color: #1e1e1e !important;
-  padding-bottom: 60px !important; /* Marge de sécurité pour laisser du vide en bas */
+  background-color: #0c0f16 !important;
+  padding-bottom: 180px !important; /* Plus d'espace sous la dernière ligne pour éviter le collage à la barre de tâches */
 }

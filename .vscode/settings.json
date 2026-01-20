@@ -1,0 +1,18 @@
+{
+  "terminal.integrated.defaultProfile.windows": "PowerShell",
+  "terminal.integrated.profiles.windows": {
+    "PowerShell": {
+      "source": "PowerShell",
+      "icon": "terminal-powershell",
+      "args": ["-NoProfile"]
+    },
+    "Command Prompt": {
+      "path": ["${env:windir}\\System32\\cmd.exe"],
+      "icon": "terminal-cmd"
+    }
+  },
+  "terminal.integrated.automationProfile.windows": "PowerShell",
+  "terminal.integrated.inheritEnv": true,
+  "terminal.integrated.env.windows": {},
+  "terminal.integrated.minimumContrastRatio": 1
+}

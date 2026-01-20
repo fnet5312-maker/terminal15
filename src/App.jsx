@@ -7,12 +7,23 @@ import './App.css';
 
 function App() {
   const [currentFile, setCurrentFile] = useState(localStorage.getItem('lastFile') || '');
+  const [openFiles, setOpenFiles] = useState(() => {
+    const saved = localStorage.getItem('openFiles');
+    return saved ? JSON.parse(saved) : (currentFile ? [currentFile] : []);
+  });
   const [fileList, setFileList] = useState([]);
   const [fileContents, setFileContents] = useState({});
   const [rootPath, setRootPath] = useState(localStorage.getItem('lastRoot') || 'C:\\');
   const [provider, setProvider] = useState(localStorage.getItem('aiProvider') || 'ollama');
   const [showCopilot, setShowCopilot] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Sauvegarder les onglets ouverts
+  useEffect(() => {
+    localStorage.setItem('openFiles', JSON.stringify(openFiles));
+    if (currentFile) localStorage.setItem('lastFile', currentFile);
+    else localStorage.removeItem('lastFile');
+  }, [openFiles, currentFile]);
 
   // 1. Charger la liste des fichiers au démarrage
   const refreshFileList = async (autoSelect = false) => {
@@ -41,10 +52,14 @@ function App() {
       if (lastFile && !currentFile) {
           handleFileChange(lastFile);
       } else if (currentFile) {
-          // Rafraîchir le contenu du fichier actuel
+          // Rafraîchir le contenu du fichier actuel et vérifier son existence
           const fileRes = await fetch(`/api/files/read?filePath=${encodeURIComponent(currentFile)}`);
           const fileData = await fileRes.json();
-          if (!fileData.error) {
+          if (fileData.error) {
+            // Si le fichier n'existe plus (supprimé via terminal), on vide l'éditeur
+            setCurrentFile('');
+            localStorage.removeItem('lastFile');
+          } else {
             setFileContents(prev => ({ 
               ...prev, 
               [currentFile]: fileData.content || '' 
@@ -60,6 +75,24 @@ function App() {
 
   useEffect(() => {
     refreshFileList(true);
+
+    // Écouter l'ouverture de fichier demandée par l'IA
+    const handleIOpenFile = (e) => {
+        handleFileChange(e.detail.filePath);
+    };
+    window.addEventListener('open-file-in-editor', handleIOpenFile);
+
+    // Écouter la fermeture de fichier demandée par l'IA ou l'interface
+    const handleICloseFile = () => {
+        setCurrentFile('');
+        localStorage.removeItem('lastFile');
+    };
+    window.addEventListener('close-file-in-editor', handleICloseFile);
+
+    return () => {
+      window.removeEventListener('open-file-in-editor', handleIOpenFile);
+      window.removeEventListener('close-file-in-editor', handleICloseFile);
+    };
   }, []);
 
   // 2. Changer de fichier
@@ -67,7 +100,9 @@ function App() {
     if (!fileName) return;
 
     setCurrentFile(fileName);
-    localStorage.setItem('lastFile', fileName);
+    if (!openFiles.includes(fileName)) {
+      setOpenFiles(prev => [...prev, fileName]);
+    }
     
     try {
       const res = await fetch(`/api/files/read?filePath=${encodeURIComponent(fileName)}`);
@@ -88,12 +123,12 @@ function App() {
     }
   };
 
-  // Synchroniser la racine du projet quand le terminal change de dossier
+  // Synchroniser la racine du projet quand le terminal ou l'interface change de dossier
   const handleRootChange = async (newPath) => {
     try {
-      if (newPath === rootPath) return; // Éviter les boucles infinies
+      if (!newPath) return; // Suppression de la condition if (newPath === rootPath) car on veut forcer le refresh
       
-      setRootPath(newPath);
+      console.log(`📡 Synchronisation vers : ${newPath}`);
       localStorage.setItem('lastRoot', newPath);
       
       const res = await fetch('/api/files/set-root', {
@@ -101,9 +136,11 @@ function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ newPath })
       });
+      
       const data = await res.json();
       if (data.success) {
-        await refreshFileList();
+        setRootPath(data.root); // Mettre à jour l'état local APRES confirmation du backend
+        refreshFileList(); // Appeler la fonction centralisée
       }
     } catch (err) {
       console.error('Erreur sync racine:', err);
@@ -159,18 +196,44 @@ function App() {
     }
   };
 
+  const handleNewFolder = async (folderPath) => {
+    try {
+      await fetch('/api/files/mkdir', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filePath: folderPath })
+      });
+      await refreshFileList();
+    } catch (err) {
+      console.error('Erreur creation dossier:', err);
+    }
+  };
+
   const handleDeleteFile = async (fileName) => {
     try {
       await fetch(`/api/files/delete?filePath=${encodeURIComponent(fileName)}`, {
         method: 'DELETE'
       });
       await refreshFileList();
-      if (currentFile === fileName) {
-        setCurrentFile('');
-      }
+      
+      // Fermer l'onglet si le fichier est supprimé
+      handleCloseFile(fileName);
     } catch (err) {
       console.error('Erreur suppression:', err);
     }
+  };
+
+  const handleCloseFile = (fileName) => {
+    const targetFile = fileName || currentFile;
+    if (!targetFile) return;
+
+    setOpenFiles(prev => {
+      const newList = prev.filter(f => f !== targetFile);
+      if (currentFile === targetFile) {
+        setCurrentFile(newList.length > 0 ? newList[newList.length - 1] : '');
+      }
+      return newList;
+    });
   };
 
   return (
@@ -203,22 +266,29 @@ function App() {
           currentFile={currentFile}
           onFileSelect={handleFileChange}
           onNewFile={handleNewFile}
+          onNewFolder={handleNewFolder}
           onDeleteFile={handleDeleteFile}
           rootPath={rootPath}
+          onPathChange={handleRootChange}
         />
         
         <div className="content">
           <Editor 
             code={fileContents[currentFile] || ''}
             fileName={currentFile}
+            openFiles={openFiles}
             onChange={handleCodeChange}
             onSave={(content) => handleSaveFile(currentFile, content)}
+            onFileSelect={handleFileChange}
+            onCloseFile={handleCloseFile}
             provider={provider}
+            rootPath={rootPath}
           />
           
           <Terminal 
             onPathChange={handleRootChange}
             onOpenFile={handleFileChange}
+            onCloseFile={handleCloseFile}
             initialPath={rootPath}
           />
         </div>
@@ -233,6 +303,7 @@ function App() {
             onCodeInsert={(code) => handleCodeChange((fileContents[currentFile] || '') + '\n' + code)}
             onFileAction={handleCreateFileWithContent}
             onPathChange={handleRootChange}
+            onRefresh={() => refreshFileList()}
           />
         )}
       </div>
